@@ -41,11 +41,8 @@ claude plugin update cache-keeper@tertium-cache-keeper --scope user
 
 Команда правит файлы расширения Claude Code (`webview/index.js`, `webview/index.css`). Оригиналы сохраняются в `~/.claude/cache-keeper/backups`. После обновления расширения правка накладывается заново при следующем запуске; на несовместимой версии плагин ничего не меняет и пишет об этом в строке. `/cache-keeper clock off` возвращает оригинальные файлы.
 
-## Разработка
+## Подробнее
 
-```sh
-npm test
-npm run test:repair
-npm run typecheck
-npm run validate
-```
+- [Как работает прогрев](docs/how-it-works.md): когда отправляется, сколько стоит, как проверяется результат, все команды.
+- [Штатный таймер Claude Code](docs/native-clock.md): что именно правится в расширении, обновления, откат.
+- [Проверки](docs/testing.md): тесты и что они покрывают.
