@@ -1,0 +1,10 @@
+{
+  "name": "cache-keeper",
+  "version": "0.2.6",
+  "description": "Session-local prompt cache controls for Claude Code graphical chats",
+  "author": {
+    "name": "tertium"
+  },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

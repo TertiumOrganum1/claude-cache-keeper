@@ -1,0 +1,17 @@
+{
+  "name": "cache-keeper",
+  "version": "0.2.6",
+  "private": true,
+  "description": "Claude Code mod for session-local prompt cache maintenance",
+  "scripts": {
+    "test": "claude plugin test .",
+    "validate": "claude plugin validate --strict .",
+    "typecheck": "tsc --noEmit",
+    "probe": "python3 scripts/probe-transport.py",
+    "test:clock": "node scripts/check-clock-bridge.cjs",
+    "test:repair": "python3 -B scripts/check-auto-bridge.py"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}
