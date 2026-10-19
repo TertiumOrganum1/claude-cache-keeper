@@ -2,6 +2,8 @@
 
 Плагин Claude Code, который держит prompt cache чата тёплым в графическом чате VS Code. Нужен Claude Code с поддержкой mods; проверено на 2.1.300.
 
+![Строка Cache Keeper над полем ввода](docs/screenshot.png)
+
 ## Установка
 
 ```sh
