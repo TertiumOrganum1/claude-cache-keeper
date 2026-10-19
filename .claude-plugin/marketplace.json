@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Personal Claude Code cache maintenance plugin",
-    "version": "0.2.6"
+    "version": "0.2.7"
   },
   "plugins": [
     {
       "name": "cache-keeper",
       "source": "./",
-      "version": "0.2.6",
+      "version": "0.2.7",
       "description": "Session-local prompt cache controls for Claude Code graphical chats"
     }
   ]

@@ -96,13 +96,40 @@ def atomic_write(path, content):
             os.unlink(temp)
 
 
-def repair(extension, helper, state, check):
+def fingerprint(version, target):
+    # A reinstall of the same version rewrites the bundle, so size/mtime join the version.
+    stat = target.stat()
+    return {'version': version, 'size': stat.st_size, 'mtime': stat.st_mtime_ns}
+
+
+def load_patched(state):
+    try:
+        data = json.loads((state / 'patched.json').read_text())
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_patched(state, records):
+    fd, temp = tempfile.mkstemp(prefix='.patched-', dir=state)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            json.dump(records, stream, indent=2)
+        os.replace(temp, state / 'patched.json')
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+
+
+def repair(extension, helper, state, check, records):
     metadata = json.loads((extension / 'package.json').read_text())
     if metadata.get('publisher', '').lower() != 'anthropic' or metadata.get('name') != 'claude-code':
         raise ValueError('Target is not Anthropic.claude-code')
     if not re.fullmatch(r'\d+\.\d+\.\d+(?:[-+][\w.-]+)?', metadata.get('version', '')):
         raise ValueError('Unrecognized extension version')
     target = extension / 'webview/index.js'
+    if not check and records.get(str(extension)) == fingerprint(metadata['version'], target):
+        return {'version': metadata['version'], 'path': str(extension), 'status': 'ready', 'reloadRequired': False, 'backup': None}
     source = target.read_text()
     candidate = patched(source, helper)
     css = extension / 'webview/index.css'
@@ -125,6 +152,8 @@ def repair(extension, helper, state, check):
             atomic_write(target, candidate)
         if styled != original_css:
             atomic_write(css, styled)
+    if not check:
+        records[str(extension)] = fingerprint(metadata['version'], target)
     return {'version': metadata['version'], 'path': str(extension), 'status': 'would-repair' if check and changed else 'repaired' if changed else 'ready', 'reloadRequired': changed and not check, 'backup': str(backup) if backup else None}
 
 
@@ -145,11 +174,15 @@ def main():
         with (args.state_dir / 'repair.lock').open('a') as lock:
             # Multiple open chats share this OS lock. It is released even on timeout/kill.
             fcntl.flock(lock, fcntl.LOCK_EX)
+            records = load_patched(args.state_dir)
+            before = dict(records)
             for extension in targets:
                 try:
-                    results.append(repair(extension, helper, args.state_dir, args.check))
+                    results.append(repair(extension, helper, args.state_dir, args.check, records))
                 except (ValueError, OSError, subprocess.SubprocessError) as error:
                     results.append({'path': str(extension), 'status': 'unsupported' if isinstance(error, ValueError) else 'error', 'detail': str(error), 'reloadRequired': False})
+            if records != before:
+                save_patched(args.state_dir, records)
         status = next((r['status'] for r in results if r['status'] in ('unsupported', 'error')), 'ok' if results else 'missing')
         report = {'status': status, 'reloadRequired': any(r['reloadRequired'] for r in results), 'extensions': results}
     except (ValueError, OSError) as error:

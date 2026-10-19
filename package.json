@@ -1,6 +1,6 @@
 {
   "name": "cache-keeper",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "description": "Claude Code mod for session-local prompt cache maintenance",
   "scripts": {

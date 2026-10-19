@@ -60,6 +60,21 @@ class AutoBridge(unittest.TestCase):
         _, report = self.run_installer()
         self.assertTrue(report['reloadRequired'])
 
+    def test_recorded_version_is_not_read_again(self):
+        path = self.extension('2.1.301')
+        self.run_installer()
+        record = json.loads((self.state / 'patched.json').read_text())
+        self.assertEqual(record[str(path.resolve())]['version'], '2.1.301')
+        # Same version, size and mtime: the installer trusts the record and leaves the file alone.
+        target = path / 'webview/index.js'
+        stat = target.stat()
+        target.write_text('x' * stat.st_size)
+        os.utime(target, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        result, report = self.run_installer()
+        self.assertEqual(result.returncode, 0, report)
+        self.assertEqual(report['extensions'][0]['status'], 'ready')
+        self.assertEqual(target.read_text(), 'x' * stat.st_size)
+
     def test_renamed_minified_bindings_are_supported(self):
         source = BUNDLE.replace('pD5', 'NewBand').replace('Q', 'tree9').replace('z', 'owners9').replace('r=function', 'effect9=function')
         path = self.extension('2.2.0', source)

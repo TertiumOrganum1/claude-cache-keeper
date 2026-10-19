@@ -33,14 +33,14 @@ export function createClockBridge($: EngineInterface) {
       if (active) $.ui.invalidate('ui.render')
     }
   }
+  // One check per plugin start: the installer skips versions it has already patched.
   const bootstrap = $.clock.after(0, async () => { await check() })
-  const periodic = $.clock.every(300_000, async () => { await check() })
   const status = () => notice || (checked && !nativeReady ? 'Таймер Claude: перезагрузи окно' : '')
   return {
     status,
     report: () => [status(), detail].filter(Boolean).join(': '),
     ticket: () => nativeReady ? '' : ticket,
     acknowledge: () => { if (active && !nativeReady) { nativeReady = true; $.ui.invalidate('ui.render') } },
-    cancel: () => { active = false; bootstrap.cancel(); periodic.cancel() },
+    cancel: () => { active = false; bootstrap.cancel() },
   }
 }
