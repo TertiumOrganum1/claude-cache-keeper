@@ -1,6 +1,6 @@
 {
   "name": "cache-keeper",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Session-local prompt cache controls for Claude Code graphical chats",
   "author": {
     "name": "tertium"

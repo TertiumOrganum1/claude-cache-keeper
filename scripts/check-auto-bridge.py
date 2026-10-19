@@ -26,6 +26,8 @@ class AutoBridge(unittest.TestCase):
         self.exts = self.root / 'extensions'
         self.exts.mkdir()
         self.state = self.root / 'state'
+        self.state.mkdir()
+        (self.state / 'bridge-enabled').touch()
 
     def extension(self, version, source=BUNDLE):
         path = self.exts / ('anthropic.claude-code-' + version)
@@ -59,6 +61,29 @@ class AutoBridge(unittest.TestCase):
         (path / 'webview/index.js').write_text(BUNDLE)
         _, report = self.run_installer()
         self.assertTrue(report['reloadRequired'])
+
+    def test_startup_without_opt_in_leaves_extension_alone(self):
+        (self.state / 'bridge-enabled').unlink()
+        path = self.extension('2.1.301')
+        result, report = self.run_installer()
+        self.assertEqual(result.returncode, 0, report)
+        self.assertEqual(report['status'], 'disabled')
+        self.assertEqual((path / 'webview/index.js').read_text(), BUNDLE)
+        _, report = self.run_installer('--enable')
+        self.assertTrue(report['reloadRequired'])
+        self.assertTrue((self.state / 'bridge-enabled').exists())
+
+    def test_disable_restores_original_files_and_stops_repairs(self):
+        path = self.extension('2.1.301')
+        self.run_installer()
+        result, report = self.run_installer('--disable')
+        self.assertEqual(result.returncode, 0, report)
+        self.assertEqual(report['extensions'][0]['status'], 'restored')
+        self.assertEqual((path / 'webview/index.js').read_text(), BUNDLE)
+        self.assertEqual((path / 'webview/index.css').read_text(), '.existing{color:red}')
+        _, report = self.run_installer()
+        self.assertEqual(report['status'], 'disabled')
+        self.assertEqual((path / 'webview/index.js').read_text(), BUNDLE)
 
     def test_recorded_version_is_not_read_again(self):
         path = self.extension('2.1.301')

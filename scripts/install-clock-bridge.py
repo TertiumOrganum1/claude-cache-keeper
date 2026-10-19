@@ -157,9 +157,28 @@ def repair(extension, helper, state, check, records):
     return {'version': metadata['version'], 'path': str(extension), 'status': 'would-repair' if check and changed else 'repaired' if changed else 'ready', 'reloadRequired': changed and not check, 'backup': str(backup) if backup else None}
 
 
+def restore(extension, state, records):
+    metadata = json.loads((extension / 'package.json').read_text())
+    records.pop(str(extension), None)
+    webview = extension / 'webview'
+    if not any(mark in (webview / 'index.js').read_text() for mark in (MARK, LEGACY_MARK)):
+        return {'version': metadata.get('version'), 'path': str(extension), 'status': 'clean', 'reloadRequired': False}
+    # Backup names start with the version and end with a sortable timestamp; take the newest unpatched copy.
+    for backup in sorted(state.glob('backups/' + metadata.get('version', '') + '-*'), reverse=True):
+        original = (backup / 'index.js').read_text()
+        if MARK in original or LEGACY_MARK in original:
+            continue
+        atomic_write(webview / 'index.js', original)
+        atomic_write(webview / 'index.css', (backup / 'index.css').read_text())
+        return {'version': metadata.get('version'), 'path': str(extension), 'status': 'restored', 'reloadRequired': True, 'backup': str(backup)}
+    raise ValueError('No unpatched backup for ' + str(metadata.get('version')) + '; reinstall the Claude Code extension')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--auto', action='store_true', help='Discover registered extensions (default without --extension)')
+    parser.add_argument('--auto', action='store_true', help='Plugin startup: repair only after --enable was run')
+    parser.add_argument('--enable', action='store_true', help='Opt in: patch now and again after extension updates')
+    parser.add_argument('--disable', action='store_true', help='Opt out and restore the original extension files')
     parser.add_argument('--extension', type=Path)
     parser.add_argument('--extensions-dir', action='append', type=Path)
     parser.add_argument('--state-dir', type=Path, default=Path.home() / '.claude/cache-keeper')
@@ -176,19 +195,26 @@ def main():
             fcntl.flock(lock, fcntl.LOCK_EX)
             records = load_patched(args.state_dir)
             before = dict(records)
-            for extension in targets:
+            opt_in = args.state_dir / 'bridge-enabled'
+            if args.disable:
+                opt_in.unlink(missing_ok=True)
+            elif args.enable and not args.check:
+                opt_in.touch()
+            # The extension is modified only after an explicit opt-in.
+            disabled = args.auto and not args.enable and not args.disable and not opt_in.exists()
+            for extension in [] if disabled else targets:
                 try:
-                    results.append(repair(extension, helper, args.state_dir, args.check, records))
+                    results.append(restore(extension, args.state_dir, records) if args.disable else repair(extension, helper, args.state_dir, args.check, records))
                 except (ValueError, OSError, subprocess.SubprocessError) as error:
                     results.append({'path': str(extension), 'status': 'unsupported' if isinstance(error, ValueError) else 'error', 'detail': str(error), 'reloadRequired': False})
             if records != before:
                 save_patched(args.state_dir, records)
-        status = next((r['status'] for r in results if r['status'] in ('unsupported', 'error')), 'ok' if results else 'missing')
+        status = 'disabled' if disabled else next((r['status'] for r in results if r['status'] in ('unsupported', 'error')), 'ok' if results else 'missing')
         report = {'status': status, 'reloadRequired': any(r['reloadRequired'] for r in results), 'extensions': results}
     except (ValueError, OSError) as error:
         report = {'status': 'error', 'detail': str(error), 'reloadRequired': False, 'extensions': results}
     print(json.dumps(report, ensure_ascii=False))
-    return 0 if report['status'] == 'ok' else 1
+    return 0 if report['status'] in ('ok', 'disabled') else 1
 
 
 if __name__ == '__main__':

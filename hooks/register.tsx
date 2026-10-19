@@ -132,7 +132,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await ensureStarted($)
     if (e.surface === 'vscode') clockBridge ??= createClockBridge($)
-    await $.command.register({ name: 'cache-keeper', description: 'Прогрев кэша текущего чата', argumentHint: '[on [1h|5m]|off|status|now]', immediate: true })
+    await $.command.register({ name: 'cache-keeper', description: 'Прогрев кэша текущего чата', argumentHint: '[on [1h|5m]|off|status|now|clock on|clock off]', immediate: true })
     await $.command.register({ name: 'cache-on', description: 'Включить прогрев кэша текущего чата', immediate: true })
     await $.command.register({ name: 'cache-off', description: 'Выключить прогрев кэша текущего чата', immediate: true })
     await $.command.register({ name: 'cache-status', description: 'Показать состояние и время следующего прогрева', immediate: true })
@@ -155,7 +155,13 @@ export const register: Register = on => {
       if (words[1] !== undefined && words[1] !== selectedTtl) { selectedTtl = words[1]; keeper.invalidate() }
       keeper.enable()
     } else if (words[0] === 'now') { keeper.enable(); await tick($, true) }
-    else if (words[0] !== '' && words[0] !== 'status') return { text: '/cache-keeper [on [1h|5m]|off|status|now]' }
+    else if (words[0] === 'clock') {
+      if (words[1] !== 'on' && words[1] !== 'off') return { text: 'Используй /cache-keeper clock on или /cache-keeper clock off' }
+      if (!clockBridge) return { text: 'Штатный таймер есть только в графическом чате VS Code' }
+      await (words[1] === 'on' ? clockBridge.enable() : clockBridge.disable())
+      return { text: clockBridge.report() || (words[1] === 'on' ? 'Таймер Claude: правка расширения включена' : 'Таймер Claude: расширение восстановлено') }
+    }
+    else if (words[0] !== '' && words[0] !== 'status') return { text: '/cache-keeper [on [1h|5m]|off|status|now|clock on|clock off]' }
     await persist($)
     return { text: await status($) }
   })
